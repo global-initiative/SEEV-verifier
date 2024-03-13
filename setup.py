@@ -8,9 +8,9 @@ install_requires = [
 ]
 
 setup(
-    name='SEEV-base-cryptography',
+    name='SEEV-verifier',
     version='0.0.1',  # Adjust the version as necessary
-    description='Base of the cryptographic library for the SEEV DRE-IP algorithm implementation',
+    description='Implementation of the SEEV DRE-IP verifier software',
     author='Timothee Dubuc',
     author_email='timothee@global-initiative.com',
     packages=find_packages(),
