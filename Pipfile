@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pycryptodome = {version="~=3.18.0"}
+SEEV-base-cryptography = {git = "git@github.com:global-initiative/SEEV-base-cryptography.git", ref = "0.0.1a"}
+
+[dev-packages]
+pytest = {version="~=8.1.1"}
+
+[requires]
+python_version = {version="~=3.10.13"}
