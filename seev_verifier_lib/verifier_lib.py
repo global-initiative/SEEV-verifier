@@ -81,13 +81,15 @@ def vote_proof(g_1: EccPoint, g_2: EccPoint,
 	B_2_p_p = g_1 * r_2 + Z * d_2
 	A_2_p = g_2 * r_2 + R * d_2
 
-	print(int((d_1 + d_2) % Nist256.order == challenge % Nist256.order), d_1 + d_2, challenge, challenge % Nist256.order, (d_1 + d_2) % Nist256.order)
+	# print(int((d_1 + d_2) % Nist256.order == challenge % Nist256.order),challenge, (d_1 + d_2) % Nist256.order)
+	# print(d_1, d_2)
+	# print((challenge - d_2) % Nist256.order, (challenge - d_1) % Nist256.order)
 	# print(A_1.xy, "\n", A_2.xy, "\n", B_1.xy, "\n", B_2.xy)
 	# print("")
 	# print(A_1_p.xy, "\n", A_2_p.xy, "\n", B_1_p.xy, "\n", B_2_p.xy)
 	# print("--------------------------------------------------------------------------------------------")
 
-	if (d_1 + d_2) % Nist256.order != challenge % Nist256.order: 	return None  # the python code implements it with a modulus...
+	if (d_1 + d_2) % Nist256.order != challenge % Nist256.order: 	return False  # the python code implements it with a modulus...
 	if A_1_p != A_1: 			return False
 	elif A_2_p != A_2: 			return False
 	# be consistent with the checks, p's with p's, p_p's with p_p's
