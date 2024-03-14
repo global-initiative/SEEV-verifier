@@ -156,8 +156,8 @@ def ballots_proof(g_1: EccPoint, g_2: EccPoint, Rs: List[EccPoint], Zs: List[Ecc
 
 	X: EccPoint = Z_sum + -(g_1*weight)
 
-	g1_r = g_1 * result;	g1_r_p = commitment_1 + X*c
-	g2_r = g_2 * result;	g2_r_p = commitment_2 + R_sum*c
+	g1_r = g_1 * result;	g1_r_p = commitment_1 + -X*c
+	g2_r = g_2 * result;	g2_r_p = commitment_2 + -R_sum*c
 	if g1_r != g1_r_p: return False
 	if g2_r != g2_r_p: return False
 
