@@ -2,51 +2,80 @@ import json
 
 import itertools
 from functools import reduce
-from pathlib import Path
 from typing import Tuple
-
+import os
+import sys
 
 from seev_verifier_lib.verifier_lib import verify_signature, load_verify_signature, load_vote_proof, vote_proof, \
 											load_ballot_proof, ballots_proof, load_tally_data, tally_check
 
 
-def main():
-	# json_location: Path = Path("reference_jsons/from_seev/response_1.json")
-	# json_location: Path = Path("reference_jsons/from_seev/persisted_h_tally_2_contest_3_1abtain_3cancels_formated.json")
-	# json_location: Path = Path("reference_jsons/from_seev/no_g_random_unformated.json")
-	json_location: Path = Path("reference_jsons/from_seev/weighted_voting_1vote_formated.json")
+def verify(data_raw):
+	"""
+	Verifies the DRE-IP source bulletin board data provided.
 
-	json_p: Path = Path(__file__).absolute().parent.parent / json_location
-
-	with open(json_p, "r") as fin:
-		data_raw = json.load(fin)
-
-	# load the data and format them
+	"""
+	print("Verification...")
+	print("----------------------------------------------------------------------------------")
 	data = load_verify_signature(data_raw);	data = zip(*data[:2], itertools.repeat(data[-1]))
 	res_signature: Tuple[bool, ...] = tuple(verify_signature(*d) for d in data)
+	print("\t- SIGNATURE\t", res_signature)
 
 	data = load_vote_proof(data_raw);	data = zip(*data)
 	res_vote_proof: Tuple[bool, ...] = tuple(vote_proof(*d) for d in data)
+	print("\t- VOTE\t\t", res_vote_proof)
 
 	data = load_ballot_proof(data_raw);	data = zip(*data)
 	res_ballot_proof: Tuple[bool, ...] = tuple(ballots_proof(*d) for d in data)
+	print("\t- BALLOT\t", res_ballot_proof)
 
 	data = load_tally_data(data_raw);	data = zip(*data)
 	res_tally_proof: Tuple[bool, ...] = tuple(tally_check(*d) for d in data)
+	print("\t- TALLY\t\t", res_tally_proof)
 
-	print("SIGNATURE", res_signature)
-	assert reduce(lambda x, y: x and y, res_signature) == True
+	final_res_signature: bool = reduce(lambda x, y: x and y, res_signature)
+	final_res_vote_proof: bool = reduce(lambda x, y: x and y, res_vote_proof)
+	final_res_ballot_proof: bool = reduce(lambda x, y: x and y, res_ballot_proof)
+	final_res_tally_proof: bool = reduce(lambda x, y: x and y, res_tally_proof)
+	election_valid = final_res_signature and final_res_vote_proof and final_res_ballot_proof and final_res_tally_proof
 
-	print("PROOF_VOTE", res_vote_proof)
-	# assert reduce(lambda x, y: x and y, res_vote_proof) == True
-
-	print("PROOF_BALLOT", res_ballot_proof)
-	# assert reduce(lambda x, y: x and y, res_ballot_proof) == True
-	#
-	# print("PROOF_TALLY", res_tally_proof)
+	print("----------------------------------------------------------------------------------\n")
+	if election_valid is True:
+		print("The election has been successfully verified.")
+	else:
+		print("The election failed to pass the verification process.")
 
 
-# assert reduce(lambda x, y: x and y, res_ballot_proof) == True
+def read_and_parse_file(file_path):
+	"""
+	Reads the content of the provided file and calls the parse function on it.
+
+	:param file_path: Path to the file (can be absolute or relative).
+	"""
+	try:
+		# Normalize the path to ensure compatibility across Unix, Linux, Windows, and MacOS
+		normalized_path = os.path.normpath(file_path)
+
+		# Open and read the file
+		with open(normalized_path, 'r', encoding='utf-8') as fin:
+			data_raw = json.load(fin)
+
+			# Call the parse function on the content of the file
+			verify(data_raw)
+	except FileNotFoundError:
+		print("Error: The file does not exist.")
+	except Exception as e:
+		print(f"An error occurred while attempting to load the file to verify: {e}")
+
 
 if __name__ == "__main__":
-	main()
+	if len(sys.argv) < 2:
+		print("Usage: python script.py <path_to_file>")
+		print("<path_to_file> is either absolute or relative to the location of this file")
+	else:
+		# Get the file path from the command line argument
+		file_path = sys.argv[1]
+
+		# Call the function to read and parse the file
+		read_and_parse_file(file_path)
+
