@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "fb62d8e7fa869ed5632a38e54cbfa1853bfa04e4188c0707a97f72ebafdc6708"
+            "sha256": "1c06bc89be45e2a9d20cf88e6f461dea203961e88a7cd1c4ab9ad76dfafec941"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -114,7 +114,7 @@
         },
         "seev-base-cryptography": {
             "git": "ssh://git@github.com/global-initiative/SEEV-base-cryptography.git",
-            "ref": "1f13dfeca2e814f577182db523f39968f5520940"
+            "ref": "1d92ca3252f476679c92d131077e9643f3eb4fc5"
         }
     },
     "develop": {
