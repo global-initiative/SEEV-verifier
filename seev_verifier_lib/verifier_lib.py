@@ -40,6 +40,20 @@ def load_verify_signature(data: Dict[str, Any]) -> Tuple[List[bytes], List[bytes
 	return stage_one_datas, stage_on_signatures, public_key
 
 
+def validate_public_key(p: EccPoint) -> bool:
+	"""
+	Performs a public key validation on the provided ECCPoint.
+	This assumes that the point has already been shown to be on the curve
+
+	:param p: a point on the NIST-256 curve
+	:return: true of the point is valid, False otherwise
+	"""
+	if p.is_point_at_infinity(): return False
+	if not (p * Nist256.order).is_point_at_infinity(): return False
+	if p.x < 0 or p.x > (Nist256.order - 1): return False
+	if p.y < 0 or p.y > (Nist256.order - 1): return False
+	return True
+
 def vote_proof(g_1: EccPoint, g_2: EccPoint,
 			   r_1: Integer, r_2: Integer,
 			   d_1: Integer, d_2: Integer,
@@ -47,6 +61,11 @@ def vote_proof(g_1: EccPoint, g_2: EccPoint,
 			   A_1: EccPoint, A_2: EccPoint,
 			   B_1: EccPoint, B_2:EccPoint,
 			   election_id: int, ballot_id: int, option_id: int, weight: int):
+
+	# public key validation
+	if validate_public_key(R) is False or validate_public_key(Z) is False:
+		return False
+
 	# from libs.cryptography.dre_ip.ballot_generator.BallotGenerator.generate_vote_cryptography
 	_context_info = ','.join([str(election_id), str(option_id), str(ballot_id)])  # yes the order is different than the parameters
 	# from libs.cryptography.dre_ip.proofs.EqualityZKP
