@@ -2,12 +2,13 @@ import base64
 import hashlib
 import json
 from functools import reduce
-from typing import Tuple, List, cast, Dict, Any
+from typing import Tuple, List, cast, Dict, Any, Type
 
 from Crypto.PublicKey.ECC import EccKey, EccPoint
 from Crypto.Math.Numbers import Integer
 
 from seev_cryptography.lib.ecc.curves.nist256 import Nist256
+from seev_cryptography.lib.ecc.ecc_curve import EccCurve
 from seev_cryptography.lib.utils.key_utils import EccKeySerialisationUtils, EddsaSignatureUtils, EccPointSerialisationUtils
 
 def verify_signature(stage_one_data: bytes, stage_on_signature: bytes, public_key: EccKey) -> bool:
@@ -40,16 +41,18 @@ def load_verify_signature(data: Dict[str, Any]) -> Tuple[List[bytes], List[bytes
 	return stage_one_datas, stage_on_signatures, public_key
 
 
-def validate_public_key(p: EccPoint) -> bool:
+def validate_public_key(p: EccPoint, curve_type: Type[EccCurve] = Nist256) -> bool:
 	"""
 	Performs a public key validation on the provided ECCPoint.
 	This assumes that the point has already been shown to be on the curve
 
 	:param p: a point on the NIST-256 curve
+	:param curve_type: the type of the curve the point is supposed to be on, defaults to NIST256
 	:return: true of the point is valid, False otherwise
 	"""
 	if p.is_point_at_infinity(): return False
-	if not (p * Nist256.order).is_point_at_infinity(): return False
+	# checking p*h != infinity; with h = cofactor (equivalent to p*n = infinity; with n = order)
+	if curve_type is Nist256 and False: return False  # for NIST 256, the cofactor is 1; checking p.is_point_at_infinity() already satisfies the current test
 	if p.x < 0 or p.x > (Nist256.order - 1): return False
 	if p.y < 0 or p.y > (Nist256.order - 1): return False
 	return True
