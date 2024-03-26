@@ -40,6 +40,50 @@ def load_verify_signature(data: Dict[str, Any]) -> Tuple[List[bytes], List[bytes
 
 	return stage_one_datas, stage_on_signatures, public_key
 
+# signature justified by libs.cryptography.dre_ip.ballot_generator.BallotGenerator.generate_vote_cryptography
+# that feed from libs.cryptography.dre_ip.proofs.OneOfNZKP
+def verify_audited_ballots(g_1: EccPoint, g_2: EccPoint, r: Integer, v: Integer, R: EccPoint, Z: EccPoint) -> bool:
+	Z_prime = g_1*((r+v) % Nist256.order)
+	R_prime = g_2*(r  % Nist256.order)
+
+	if Z_prime != Z or R_prime != R: 	return False
+	else: 								return True
+
+
+def load_verify_audited_ballots(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint], List[Integer], List[Integer],
+											List[Integer], List[Integer], List[EccPoint], List[EccPoint],
+											List[EccPoint], List[EccPoint], List[EccPoint], List[EccPoint],
+											List[int], List[int], List[int], List[int]]:
+
+	g_1s: List[EccPoint] = list(); 	g_2s: List[EccPoint] = list()
+	rs: List[Integer] = list(); 	vs: List[Integer] = list()
+	R: List[EccPoint] = list(); 	Z: List[EccPoint] = list()
+	import_pt_fct = EccPointSerialisationUtils.import_named_curve_ecc_point_from_string_public_key
+
+	g_1: EccPoint = Nist256.get_generator(); g_2: EccPoint = import_pt_fct(data["election_context"]["unique_generator"])
+
+	for ballot_receipt in data["ballot_set"]:
+		if ballot_receipt["state"] != 3: continue  # only consider the audited ballots
+		s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]
+		s_two = ballot_receipt["stage_two"]; s_two_data = s_two["stage_two_data"]
+
+		sort_option_ids = lambda s: sorted(s, key=lambda i:i["option_id"])
+
+		for one_of_n_zkp, zkp_secrets in zip(sort_option_ids(s_one_data["one_of_n_zkps"]), sort_option_ids(s_two_data["zkp_secrets"])):
+			if int(one_of_n_zkp["option_id"]) != int(zkp_secrets["option_id"]):  # this should not happen, but in case an option is missing, that will be raised
+				raise ValueError("Missaligned option_ids between one_of_n_zkps and zkp_secrets, please contact your administrator")
+			g_1s.append(g_1)
+			g_2s.append(g_2)
+
+			rs.append(Integer(zkp_secrets["random"]))
+			vs.append(Integer(zkp_secrets["vote_flag"]))
+
+			R.append(import_pt_fct(one_of_n_zkp["cyphertext_R"]))
+			Z.append(import_pt_fct(one_of_n_zkp["cyphertext_Z"]))
+
+
+	return g_1s, g_2s, rs, vs, R, Z
+
 
 def validate_public_key(p: EccPoint, curve_type: Type[EccCurve] = Nist256) -> bool:
 	"""
