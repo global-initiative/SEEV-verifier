@@ -52,9 +52,10 @@ def validate_public_key(p: EccPoint, curve_type: Type[EccCurve] = Nist256) -> bo
 	"""
 	if p.is_point_at_infinity(): return False
 	# checking p*h != infinity; with h = cofactor (equivalent to p*n = infinity; with n = order)
-	if curve_type is Nist256 and False: return False  # for NIST 256, the cofactor is 1; checking p.is_point_at_infinity() already satisfies the current test
-	if p.x < 0 or p.x > (Nist256.order - 1): return False
-	if p.y < 0 or p.y > (Nist256.order - 1): return False
+	if curve_type is Nist256:			pass # for NIST 256, the cofactor is 1; checking p.is_point_at_infinity() already satisfies the current test
+	else: 								raise ValueError("Unknown curve type")
+	if p.x < 0 or p.x > (Nist256.prime - 1): return False
+	if p.y < 0 or p.y > (Nist256.prime - 1): return False
 	return True
 
 def vote_proof(g_1: EccPoint, g_2: EccPoint,
