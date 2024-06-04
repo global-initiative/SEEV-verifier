@@ -29,6 +29,10 @@ def load_verify_signature(data: Dict[str, Any]) -> Tuple[List[bytes], List[bytes
 
 	stage_one_datas: List[bytes] = list(); stage_on_signatures: List[bytes] = list()
 	for ballot_receipt in data["ballot_set"]:
+		# state 0 receipt have just been created and not acted upon
+		# they do not have any option selected (let alone confirmed)
+		if ballot_receipt["state"] == 0: continue
+
 		s_one = ballot_receipt["stage_one"]
 		# justified by core.serializers.serialization_utils.serialized_data_to_message
 		stage_one_data: bytes = json.dumps(s_one["stage_one_data"]).encode('utf-8')
@@ -247,6 +251,10 @@ def load_ballot_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoi
 
 	election_id: int = int(data["election_context"]["election_id"])
 	for ballot_receipt in data["ballot_set"]:
+		# state 0 receipt have just been created and not acted upon
+		# they do not have any option selected (let alone confirmed)
+		if ballot_receipt["state"] == 0: continue
+
 		s_one_data = ballot_receipt["stage_one"]["stage_one_data"]; eq_zkp = s_one_data["equality_zkp"]
 
 		# This is g_1^s and g_2^s
@@ -268,6 +276,12 @@ def load_ballot_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoi
 
 def tally_check(g_1: EccPoint, g_2: EccPoint, options_Rs: List[EccPoint], options_Zs: List[EccPoint],
 		  options_tally: int, options_sum: int):
+
+	# in the event where nobody voted in that election, the ballot set
+	# is empty, so is the final tally along with any summations.
+	if len(options_Rs) == 0 or len(options_Zs) == 0:
+		return True
+
 	Rs_sum = reduce(lambda x, y: x + y, options_Rs[1:], options_Rs[0]); Zs_sum = reduce(lambda x, y: x + y, options_Zs[1:], options_Zs[0])
 
 	# the modulus operation seems to be required, save the following error appears: ValueError: Error 14 during scalar multiplication
