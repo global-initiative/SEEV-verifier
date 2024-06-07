@@ -9,7 +9,9 @@ from Crypto.Math.Numbers import Integer
 
 from seev_cryptography.lib.ecc.curves.nist256 import Nist256
 from seev_cryptography.lib.ecc.ecc_curve import EccCurve
+from seev_cryptography.lib.utils.container_sorting import sort_container
 from seev_cryptography.lib.utils.key_utils import EccKeySerialisationUtils, EddsaSignatureUtils, EccPointSerialisationUtils
+
 
 def verify_signature(stage_one_data: bytes, stage_on_signature: bytes, public_key: EccKey) -> bool:
 	try:
@@ -22,7 +24,7 @@ def verify_signature(stage_one_data: bytes, stage_on_signature: bytes, public_ke
 		return False
 
 def load_verify_signature(data: Dict[str, Any]) -> Tuple[List[bytes], List[bytes], EccKey]:
-
+	data = sort_container(data)  # sort the data received to prevent inconsistencies due to JSON processing
 
 	# justified by core.serializers.serializer_fields.PublicEccKeySerializationField
 	public_key: EccKey = EccKeySerialisationUtils.import_public_key_from_string(data["election_context"]["public_key"])
@@ -58,6 +60,7 @@ def load_verify_audited_ballots(data: Dict[str, Any]) -> Tuple[List[EccPoint], L
 											List[Integer], List[Integer], List[EccPoint], List[EccPoint],
 											List[EccPoint], List[EccPoint], List[EccPoint], List[EccPoint],
 											List[int], List[int], List[int], List[int]]:
+	data = sort_container(data)  # sort the data received to prevent inconsistencies due to JSON processing
 
 	g_1s: List[EccPoint] = list(); 	g_2s: List[EccPoint] = list()
 	rs: List[Integer] = list(); 	vs: List[Integer] = list()
@@ -173,6 +176,7 @@ def load_vote_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint
 											List[Integer], List[Integer], List[EccPoint], List[EccPoint],
 											List[EccPoint], List[EccPoint], List[EccPoint], List[EccPoint],
 											List[int], List[int], List[int], List[int]]:
+	data = sort_container(data)  # sort the data received to prevent inconsistencies due to JSON processing
 
 	g_1s: List[EccPoint] = list(); 	g_2s: List[EccPoint] = list()
 	r_1s: List[Integer] = list(); 	r_2s: List[Integer] = list()
@@ -238,6 +242,7 @@ def ballots_proof(g_1: EccPoint, g_2: EccPoint, Rs: List[EccPoint], Zs: List[Ecc
 
 def load_ballot_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint], List[List[EccPoint]], List[List[EccPoint]],
 											List[Integer], List[EccPoint], List[EccPoint], List[int], List[int], List[int]]:
+	data = sort_container(data)  # sort the data received to prevent inconsistencies due to JSON processing
 
 	g_1s: List[EccPoint] = list(); 		g_2s: List[EccPoint] = list()
 	Rs: List[List[EccPoint]] = list(); 	Zs: List[List[EccPoint]] = list()
@@ -294,7 +299,7 @@ def tally_check(g_1: EccPoint, g_2: EccPoint, options_Rs: List[EccPoint], option
 	return True
 
 def load_tally_data(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint], List[List[EccPoint]], List[List[EccPoint]], List[Integer], List[Integer]]:
-
+	data = sort_container(data)  # sort the data received to prevent inconsistencies due to JSON processing
 
 	options_Rs: List[List[EccPoint]] 	= list()
 	options_Zs: List[List[EccPoint]] 	= list()
