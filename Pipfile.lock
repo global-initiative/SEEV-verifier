@@ -114,7 +114,7 @@
         },
         "seev-base-cryptography": {
             "git": "ssh://git@github.com/global-initiative/SEEV-base-cryptography.git",
-            "ref": "5bda1f77e57ab58131804559d2fd604cf444db4f"
+            "ref": "648ec99f88ab266efcd1268137929a7aaed9bddd"
         }
     },
     "develop": {
