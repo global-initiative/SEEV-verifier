@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 pycryptodome = {version="~=3.18.0"}
-SEEV-base-cryptography = {git = "git@github.com:global-initiative/SEEV-base-cryptography.git", ref = "0.0.3"}
+SEEV-base-cryptography = {git = "git@github.com:global-initiative/SEEV-base-cryptography.git", ref = "0.0.4"}
 
 [dev-packages]
 pytest = {version="~=8.1.1"}

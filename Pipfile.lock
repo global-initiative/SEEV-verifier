@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f6752783f021312d6878c1720aa3a9f4decd0391a66b0b8984877252e71bafb1"
+            "sha256": "3bfd019cba1ee9f4100460e31f3e95c3b3d461b17b0ee84d64d4709b176df763"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -114,7 +114,7 @@
         },
         "seev-base-cryptography": {
             "git": "ssh://git@github.com/global-initiative/SEEV-base-cryptography.git",
-            "ref": "718e26564cb34db194629712c924896d2e5d7e3e"
+            "ref": "648ec99f88ab266efcd1268137929a7aaed9bddd"
         }
     },
     "develop": {
@@ -136,11 +136,11 @@
         },
         "packaging": {
             "hashes": [
-                "sha256:2ddfb553fdf02fb784c234c7ba6ccc288296ceabec964ad2eae3777778130bc5",
-                "sha256:eb82c5e3e56209074766e6885bb04b8c38a0c015d0a30036ebe7ece34c9989e9"
+                "sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002",
+                "sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
             ],
-            "markers": "python_version >= '3.7'",
-            "version": "==24.0"
+            "markers": "python_version >= '3.8'",
+            "version": "==24.1"
         },
         "pluggy": {
             "hashes": [
