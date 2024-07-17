@@ -9,7 +9,7 @@ install_requires = [
 
 setup(
     name='SEEV-verifier',
-    version='0.0.10',  # Adjust the version as necessary
+    version='0.0.11',
     description='Implementation of the SEEV DRE-IP verifier software',
     author='Timothee Dubuc',
     author_email='timothee@global-initiative.com',
