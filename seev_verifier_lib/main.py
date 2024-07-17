@@ -2,7 +2,7 @@ import json
 
 import itertools
 from functools import reduce
-from typing import Tuple
+from typing import Tuple, Callable
 import os
 import sys
 
@@ -19,29 +19,30 @@ def verify(data_raw):
 	print("----------------------------------------------------------------------------------")
 	data = load_verify_signature(data_raw);	data = zip(*data[:2], itertools.repeat(data[-1]))
 	res_signature: Tuple[bool, ...] = tuple(verify_signature(*d) for d in data)
-	print("\t- SIGNATURE\t", res_signature)
+	print("\t- SIGNATURE\t\t", res_signature)
 
 	data = load_vote_proof(data_raw);	data = zip(*data)
 	res_vote_proof: Tuple[bool, ...] = tuple(vote_proof(*d) for d in data)
-	print("\t- VOTE\t\t", res_vote_proof)
+	print("\t- VOTE\t\t\t", res_vote_proof)
 
 	data = load_ballot_proof(data_raw);	data = zip(*data)
 	res_ballot_proof: Tuple[bool, ...] = tuple(ballots_proof(*d) for d in data)
-	print("\t- BALLOT\t", res_ballot_proof)
+	print("\t- BALLOT\t\t", res_ballot_proof)
 
 	data = load_tally_data(data_raw);	data = zip(*data)
 	res_tally_proof: Tuple[bool, ...] = tuple(tally_check(*d) for d in data)
-	print("\t- TALLY\t\t", res_tally_proof)
+	print("\t- TALLY\t\t\t", res_tally_proof)
 	
 	data = load_verify_audited_ballots(data_raw);	data = zip(*data)
 	res_audited_ballots: Tuple[bool, ...] = tuple(verify_audited_ballots(*d) for d in data)
-	print("\t- AUDITED BALLOTS\t\t", res_audited_ballots)
+	print("\t- AUDITED BALLOTS\t", res_audited_ballots)
 
-	final_res_signature: bool = reduce(lambda x, y: x and y, res_signature)
-	final_res_vote_proof: bool = reduce(lambda x, y: x and y, res_vote_proof)
-	final_res_ballot_proof: bool = reduce(lambda x, y: x and y, res_ballot_proof)
-	final_res_tally_proof: bool = reduce(lambda x, y: x and y, res_tally_proof)
-	final_res_audited_ballots: bool = reduce(lambda x, y: x and y, res_audited_ballots)
+	reduce_fct: Callable[[bool, bool], bool] = lambda x, y: (x is True) and (y is True)
+	final_res_signature: bool = reduce(reduce_fct, res_signature, True)
+	final_res_vote_proof: bool = reduce(reduce_fct, res_vote_proof, True)
+	final_res_ballot_proof: bool = reduce(reduce_fct, res_ballot_proof, True)
+	final_res_tally_proof: bool = reduce(reduce_fct, res_tally_proof, True)
+	final_res_audited_ballots: bool = reduce(reduce_fct, res_audited_ballots, True)
 	election_valid = final_res_signature and final_res_vote_proof and final_res_ballot_proof and final_res_tally_proof and final_res_audited_ballots
 
 	print("----------------------------------------------------------------------------------\n")
