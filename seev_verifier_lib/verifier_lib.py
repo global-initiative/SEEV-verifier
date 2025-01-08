@@ -2,7 +2,8 @@ import base64
 import hashlib
 import json
 from functools import reduce
-from typing import Tuple, List, cast, Dict, Any, Type, Optional
+from types import NoneType
+from typing import Tuple, List, cast, Dict, Any, Type, Optional, Union
 
 from Crypto.PublicKey.ECC import EccKey, EccPoint
 from Crypto.Math.Numbers import Integer
@@ -169,14 +170,15 @@ def vote_proof(g_1: EccPoint, g_2: EccPoint,
 	return True
 
 
-def vote_proof_list(g_1: EccPoint, g_2: EccPoint,
-					r_ss: List[List[Integer]], d_ss: List[List[Integer]],
+def vote_proof_list(r_ss: List[List[Integer]], d_ss: List[List[Integer]],
 					R_s: List[EccPoint], Z_s:List[EccPoint],
 					A_ss: List[List[EccPoint]], B_ss: List[List[EccPoint]],
 					election_ids: List[int], ballot_ids: List[int],
 					option_ids: List[int], weights: List[int],
-					election_data: Dict[str, int]) -> bool:
+					election_data: Dict[str, Union[int, EccPoint, NoneType]]) -> bool:
 	ballot_valid: bool = True; total_vote_weight: int = 0; vote_instances: int = 0
+	min_votes, max_votes = election_data["min_votes"], election_data["max_votes"]
+	g_1, g_2 = election_data["g_1"], election_data["g_2"]
 	for r_s, d_s, R, Z, A_s, B_s, election_id, ballot_id, option_id, weight in zip(r_ss, d_ss, R_s, Z_s, A_ss, B_ss, election_ids, ballot_ids, option_ids, weights):
 		vote_valid, vote_weight = vote_proof_list_single(g_1, g_2, r_s, d_s, R, Z, A_s, B_s, election_id, ballot_id, option_id, weight, weight_scan=election_data["voting_type"] == 2)
 		ballot_valid &= vote_valid
@@ -185,13 +187,16 @@ def vote_proof_list(g_1: EccPoint, g_2: EccPoint,
 
 	if ballot_valid is False: return False
 	if election_data["voting_type"] == 0:  		# default FPTP
-		if vote_instances != 1: return False
+		if vote_instances != 1: print("BAD FPTP"); return False
 	elif election_data["voting_type"] == 1:  	# weighted voting
-		if vote_instances != 1: return False
+		if vote_instances != 1: print(f"BAD WEIGHTED VOTING, {vote_instances}"); return False
 	elif election_data["voting_type"] == 2:  	# split voting
-		if total_vote_weight != weights[0]: return False 	# this is the weight of the ballot repeated multiple times
+		if total_vote_weight != weights[0]: print("BAD SPLIT VOTING"); return False 	# this is the weight of the ballot repeated multiple times
 	elif election_data["voting_type"] == 3:  	# weighted approval voting
-		pass
+		if min_votes == max_votes == None: print(f"BAD APPROVAL_VOTING PARAMETERS [{min_votes};{max_votes}] parameters not set"); return False
+		if vote_instances < min_votes or vote_instances > max_votes: print(f"BAD APPROVAL_VOTING VOTING {vote_instances} for limits [{min_votes};{max_votes}]"); return False
+
+	return True
 
 
 def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
@@ -335,7 +340,7 @@ def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
 				if B_p_1 != B: print("B_p_0 != B and B_p_1 != B"); valid = False; break
 			else:
 				found_right_weight: bool = False
-				for candidate_weight in range(1, weight):
+				for candidate_weight in range(1, weight+1):
 					B_p_1 = g_1 * r_s[i] + (Z + -(g_1 * candidate_weight)) * d_s[i]
 					if B_p_1 == B: found_right_weight = True; found_weight = candidate_weight; break # found the right one
 				if found_right_weight is False: print("B_p_0 != B and not valid weight for B_p_1"); valid = False; break
@@ -355,10 +360,11 @@ def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
 	# elif (B_2_p != B_2 and B_1_p == B_1) and (B_2_p_p != B_2 and B_1_p_p == B_1): 			return False
 
 	if valid == False: return False, 0
-	if voted_option_selected == nonvoted_option_selected: return False, 0  # we either vote for an option or we do not.
-	if not (voted_option_selected == 2 or nonvoted_option_selected == 2): return False, 0  # one of the two options has been selected
+	if voted_option_selected == nonvoted_option_selected: print("undecided vote"); return False, 0  # we either vote for an option or we do not.
+	if not (voted_option_selected == len(A_s) or nonvoted_option_selected == len(A_s)): print(f"inconsistent vote {voted_option_selected}/{nonvoted_option_selected}"); return False, 0  # one of the two options has been selected
 
-	return True, int(voted_option_selected == 2)*found_weight
+	print(f"inconsistent vote {voted_option_selected}/{nonvoted_option_selected} - {int(voted_option_selected == len(A_s))*found_weight}")
+	return True, int(voted_option_selected == len(A_s))*found_weight
 
 def load_vote_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint], List[Integer], List[Integer],
 											List[Integer], List[Integer], List[EccPoint], List[EccPoint],
@@ -407,11 +413,11 @@ def load_vote_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint
 
 	return g_1s, g_2s, r_1s, r_2s, d_1s, d_2s, R, Z, A_1s, A_2s, B_1s, B_2s, election_ids, ballot_ids, option_ids, weights
 
-def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint]], List[List[EccPoint]],
-											List[List[List[Integer]]], List[List[List[Integer]]],
+def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[List[Integer]]], List[List[List[Integer]]],
 											List[List[EccPoint]], List[List[EccPoint]],
 											List[List[List[EccPoint]]], List[List[List[EccPoint]]],
-											List[List[int]], List[List[int]], List[List[int]], List[List[int]]], Dict[str, int]]:
+											List[List[int]], List[List[int]], List[List[int]], List[List[int]]],
+											Dict[str, Union[int, EccPoint, NoneType]]]:
 
 	g_1ss: List[List[EccPoint]] = list(); 	g_2ss: List[List[EccPoint]] = list()
 	r_ss: List[List[List[Integer]]] = list(); d_ss: List[List[List[Integer]]] = list()
@@ -425,8 +431,12 @@ def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint
 	g_1: EccPoint = Nist256.get_generator(); g_2: EccPoint = import_pt_fct(data["election_context"]["unique_generator"])
 
 	election_id: int = int(data["election_context"]["election_id"])
-	election_data: Dict[str, int] = {"election_id": election_id, "voting_type": int(data["election_context"]["voting_type"])}
+	election_data: Dict[str, Union[int, EccPoint, NoneType]] = {"election_id": election_id, "voting_type": int(data["election_context"]["voting_type"]),
+													  "g_1": g_1, "g_2": g_2,
+													  'min_votes': data["election_context"]["min_votes"] if 'min_votes' in data["election_context"] else None,
+													  'max_votes': data["election_context"]["max_votes"] if 'max_votes' in data["election_context"] else None}
 	for ballot_receipt in data["ballot_set"]:
+		if ballot_receipt["state"]  == 0: continue  # ignore the ballot without options selected as those cannot be verified
 		s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]; eq_zkp = s_one_data["equality_zkp"]
 		ballot_id: int = int(ballot_receipt["ballot_id"]); weight: int = int(ballot_receipt["weight"])
 		
@@ -438,8 +448,6 @@ def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint
 		weights: List[int] = list()
 
 		for one_of_n_zkp in s_one_data["one_of_n_zkps"]:
-			g_1s.append(g_1)
-			g_2s.append(g_2)
 
 			r_s.append([Integer(i) for i in one_of_n_zkp["result_r_i"]])
 			d_s.append([Integer(i) for i in one_of_n_zkp["result_d_i"]])
@@ -461,7 +469,7 @@ def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint
 		election_idss.append(election_ids); ballot_idss.append(ballot_ids); option_idss.append(option_ids)
 		weightss.append(weights)
 
-	return (g_1ss, g_2ss, r_ss, d_ss, R_ss, Z_ss, A_ss, B_ss, election_idss, ballot_idss, option_idss, weightss), election_data
+	return (r_ss, d_ss, R_ss, Z_ss, A_ss, B_ss, election_idss, ballot_idss, option_idss, weightss), election_data
 
 def ballots_proof(g_1: EccPoint, g_2: EccPoint, Rs: List[EccPoint], Zs: List[EccPoint], result: int,
 				  commitment_1: EccPoint, commitment_2: EccPoint, election_id: int, ballot_id: int, weight: int) -> bool:
