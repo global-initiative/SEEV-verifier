@@ -180,21 +180,28 @@ def vote_proof_list(r_ss: List[List[Integer]], d_ss: List[List[Integer]],
 	min_votes, max_votes = election_data["min_votes"], election_data["max_votes"]
 	g_1, g_2 = election_data["g_1"], election_data["g_2"]
 	for r_s, d_s, R, Z, A_s, B_s, election_id, ballot_id, option_id, weight in zip(r_ss, d_ss, R_s, Z_s, A_ss, B_ss, election_ids, ballot_ids, option_ids, weights):
-		vote_valid, vote_weight = vote_proof_list_single(g_1, g_2, r_s, d_s, R, Z, A_s, B_s, election_id, ballot_id, option_id, weight, weight_scan=election_data["voting_type"] == 2)
+		vote_valid, vote_weight = vote_proof_list_single(g_1, g_2, r_s, d_s, R, Z, A_s, B_s,
+														 election_id, ballot_id, option_id, weight,
+														 election_data,
+														 weight_scan=election_data["voting_type"] == 2)
 		ballot_valid &= vote_valid
 		total_vote_weight += vote_weight
 		if vote_weight > 0: vote_instances+=1
 
 	if ballot_valid is False: return False
 	if election_data["voting_type"] == 0:  		# default FPTP
-		if vote_instances != 1: print("BAD FPTP"); return False
+		pass
+		# if vote_instances != 1: print("BAD FPTP"); return False
 	elif election_data["voting_type"] == 1:  	# weighted voting
-		if vote_instances != 1: print(f"BAD WEIGHTED VOTING, {vote_instances}"); return False
+		pass
+		# if vote_instances != 1: print(f"BAD WEIGHTED VOTING, {vote_instances}"); return False
 	elif election_data["voting_type"] == 2:  	# split voting
-		if total_vote_weight != weights[0]: print("BAD SPLIT VOTING"); return False 	# this is the weight of the ballot repeated multiple times
+		# if total_vote_weight != weights[0]: print("BAD SPLIT VOTING"); return False 	# this is the weight of the ballot repeated multiple times
+		pass
 	elif election_data["voting_type"] == 3:  	# weighted approval voting
 		if min_votes == max_votes == None: print(f"BAD APPROVAL_VOTING PARAMETERS [{min_votes};{max_votes}] parameters not set"); return False
-		if vote_instances < min_votes or vote_instances > max_votes: print(f"BAD APPROVAL_VOTING VOTING {vote_instances} for limits [{min_votes};{max_votes}]"); return False
+		pass
+		# if vote_instances < min_votes or vote_instances > max_votes: print(f"BAD APPROVAL_VOTING VOTING {vote_instances} for limits [{min_votes};{max_votes}]"); return False
 
 	return True
 
@@ -204,7 +211,8 @@ def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
 					R: EccPoint, Z:EccPoint,
 					A_s: List[EccPoint], B_s: List[EccPoint],
 					election_id: int, ballot_id: int,
-					option_id: int, weight: int, weight_scan: bool=False) -> Tuple[bool, int]:
+					option_id: int, weight: int, election_data: Dict[str, Union[int, EccPoint, NoneType]],
+						   weight_scan: bool=False) -> Tuple[bool, int]:
 	"""
 
 	:param g_1:
@@ -244,7 +252,7 @@ def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
 											*[B.xy for B in B_s]])
 	# print("PRE_HASH", message)
 	# print("HASH", hashlib.sha256(message.encode("utf-8")).digest().decode("utf-8"))
-	challenge: bytes = Integer.from_bytes(hashlib.sha256(message.encode("utf-8")).digest(), 'big')
+	challenge: Integer = Integer.from_bytes(hashlib.sha256(message.encode("utf-8")).digest(), 'big')
 
 	# B_1_p = g_1*r_1 + Z*d_1
 	# A_1_p = g_2*r_1 + R*d_1
@@ -329,27 +337,38 @@ def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
 	# need to scan for the position of the selected element, and then assert that all the rest is not selected
 	valid: bool = True; voted_option_selected: int = 0
 	nonvoted_option_selected: int = 0; found_weight: int = weight
-	for i, (A, B) in enumerate(zip(A_s, B_s)):  # consume all the alternative forms
+	voting_type = int(election_data["voting_type"])
+	if voting_type == 0: weights = [0, 1]
+	elif voting_type == 1: weights = [0, weight]
+	elif voting_type == 2: weights = range(weight+1)
+	elif voting_type == 3: weights = [0, weight]  # This should be [0, weight], because we either vote for an option or not
+	else: raise NotImplementedError
+	for i, (A, B, w_i) in enumerate(zip(A_s, B_s, weights)):  # consume all the alternative forms
 		A_p = g_2 * r_s[i] + R * d_s[i]
 		if A != A_p: print("A != A_p"); valid = False; break
 
-		B_p_0 = g_1 * r_s[i] + Z * d_s[i]; B_p_1 = 0 # B_p_1 only computed if we think we have voted for this option
-		if B_p_0 != B: # we seem to have voted for this option, computing the voted path
-			if weight_scan is False:
-				B_p_1 = g_1 * r_s[i] + (Z + -(g_1 * found_weight)) * d_s[i]
-				if B_p_1 != B: print("B_p_0 != B and B_p_1 != B"); valid = False; break
-			else:
-				found_right_weight: bool = False
-				for candidate_weight in range(1, weight+1):
-					B_p_1 = g_1 * r_s[i] + (Z + -(g_1 * candidate_weight)) * d_s[i]
-					if B_p_1 == B: found_right_weight = True; found_weight = candidate_weight; break # found the right one
-				if found_right_weight is False: print("B_p_0 != B and not valid weight for B_p_1"); valid = False; break
+		B_p = g_1 * r_s[i] + (Z + -(g_1 * w_i)) * d_s[i]
+		if B_p != B: print(f"B_p != B {w_i} - {len(A_s)}, {len(weights)}"); valid = False; break
+		else: print(f"{w_i}")
+
+
+		# B_p_0 = g_1 * r_s[i] + Z * d_s[i]; B_p_1 = 0 # B_p_1 only computed if we think we have voted for this option
+		# if B_p_0 != B: # we seem to have voted for this option, computing the voted path
+		# 	if weight_scan is False:
+		# 		B_p_1 = g_1 * r_s[i] + (Z + -(g_1 * found_weight)) * d_s[i]
+		# 		if B_p_1 != B: print("B_p_0 != B and B_p_1 != B"); valid = False; break
+		# 	else:
+		# 		found_right_weight: bool = False
+		# 		for candidate_weight in range(1, weight+1):
+		# 			B_p_1 = g_1 * r_s[i] + (Z + -(g_1 * candidate_weight)) * d_s[i]
+		# 			if B_p_1 == B: print(f"FOUND_WEIGHT {candidate_weight}"); found_right_weight = True; found_weight = candidate_weight; break # found the right one
+		# 		if found_right_weight is False: print("B_p_0 != B and not valid weight for B_p_1"); valid = False; break
 
 		# integrity
-		if B_p_0 != B and B_p_1 != B: print("B_p_0 != B and B_p_1 != B"); valid = False
+		# if B_p_0 != B and B_p_1 != B: print("B_p_0 != B and B_p_1 != B"); valid = False
 		# selections
-		if B_p_0 == B:  nonvoted_option_selected += 1
-		if B_p_1 == B:	voted_option_selected += 1
+		# if B_p_0 == B:  nonvoted_option_selected += 1
+		# if B_p_1 == B:	voted_option_selected += 1
 		if valid == False: break  # if something went wrong
 		
 		
@@ -360,8 +379,8 @@ def vote_proof_list_single(g_1: EccPoint, g_2: EccPoint,
 	# elif (B_2_p != B_2 and B_1_p == B_1) and (B_2_p_p != B_2 and B_1_p_p == B_1): 			return False
 
 	if valid == False: return False, 0
-	if voted_option_selected == nonvoted_option_selected: print("undecided vote"); return False, 0  # we either vote for an option or we do not.
-	if not (voted_option_selected == len(A_s) or nonvoted_option_selected == len(A_s)): print(f"inconsistent vote {voted_option_selected}/{nonvoted_option_selected}"); return False, 0  # one of the two options has been selected
+	# if voted_option_selected == nonvoted_option_selected: print("undecided vote"); return False, 0  # we either vote for an option or we do not.
+	# if not (voted_option_selected == len(A_s) or nonvoted_option_selected == len(A_s)): print(f"inconsistent vote {voted_option_selected}/{nonvoted_option_selected}"); return False, 0  # one of the two options has been selected
 
 	print(f"inconsistent vote {voted_option_selected}/{nonvoted_option_selected} - {int(voted_option_selected == len(A_s))*found_weight}")
 	return True, int(voted_option_selected == len(A_s))*found_weight
@@ -385,7 +404,7 @@ def load_vote_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint
 
 	election_id: int = int(data["election_context"]["election_id"])
 	for ballot_receipt in data["ballot_set"]:
-		s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]; eq_zkp = s_one_data["equality_zkp"]
+		s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]
 		ballot_id: int = int(ballot_receipt["ballot_id"]); weight: int = int(ballot_receipt["weight"])
 
 		for one_of_n_zkp in s_one_data["one_of_n_zkps"]:
@@ -437,7 +456,7 @@ def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[List[Int
 													  'max_votes': data["election_context"]["max_votes"] if 'max_votes' in data["election_context"] else None}
 	for ballot_receipt in data["ballot_set"]:
 		if ballot_receipt["state"]  == 0: continue  # ignore the ballot without options selected as those cannot be verified
-		s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]; eq_zkp = s_one_data["equality_zkp"]
+		s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]
 		ballot_id: int = int(ballot_receipt["ballot_id"]); weight: int = int(ballot_receipt["weight"])
 		
 		g_1s: List[EccPoint] = list(); 	g_2s: List[EccPoint] = list()
@@ -471,9 +490,14 @@ def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[List[Int
 
 	return (r_ss, d_ss, R_ss, Z_ss, A_ss, B_ss, election_idss, ballot_idss, option_idss, weightss), election_data
 
-def ballots_proof(g_1: EccPoint, g_2: EccPoint, Rs: List[EccPoint], Zs: List[EccPoint], result: int,
-				  commitment_1: EccPoint, commitment_2: EccPoint, election_id: int, ballot_id: int, weight: int) -> bool:
+def ballots_proof(Rs: List[EccPoint], Zs: List[EccPoint], result: int,
+				  commitment_1: EccPoint, commitment_2: EccPoint, election_id: int, ballot_id: int, weight: int,
+				  election_data: Dict[str, Union[int, EccPoint, NoneType]]) -> bool:
 	R_sum = reduce(lambda x, y: x + y, Rs[1:], Rs[0]); Z_sum = reduce(lambda x, y: x + y, Zs[1:], Zs[0])
+
+	min_votes, max_votes = election_data["min_votes"], election_data["max_votes"]
+	g_1: EccPoint; g_2: EccPoint
+	g_1, g_2 = election_data["g_1"], election_data["g_2"]
 
 	_context_info = ','.join([str(election_id), str(ballot_id)])
 	message: str = ','.join(str(i) for i in [_context_info,  # This matches the python code's order
@@ -481,18 +505,84 @@ def ballots_proof(g_1: EccPoint, g_2: EccPoint, Rs: List[EccPoint], Zs: List[Ecc
 											 *commitment_1.xy, *commitment_2.xy])
 
 	c: int = cast(int, Integer.from_bytes(hashlib.sha256(message.encode("utf-8")).digest(), 'big'))
-
-	X: EccPoint = Z_sum + -(g_1*weight)
-
-	g1_r = g_1 * result;	g1_r_p = commitment_1 + -X*c
-	g2_r = g_2 * result;	g2_r_p = commitment_2 + -R_sum*c
-	if g1_r != g1_r_p: return False
+	g2_r = g_2 * result; g2_r_p = commitment_2 + -R_sum * c
 	if g2_r != g2_r_p: return False
+	g1_r = g_1 * result;
+	if election_data["voting_type"] == 3:
+		found_g_1_r:bool = False
+		for mult in range(min_votes, max_votes + 1):  # iterate over the possible number of options selected
+			X: EccPoint = Z_sum + -(g_1 * weight * mult)
+			g1_r_p = commitment_1 + -X * c
+			if g1_r == g1_r_p: found_g_1_r = True; break
+		if found_g_1_r is False: return False  # no g_1_r value match
+	else:
+		X: EccPoint = Z_sum + -(g_1 * weight)
+		g1_r_p = commitment_1 + -X * c
+		if g1_r != g1_r_p: return False
+		
+	# X: EccPoint = Z_sum + -(g_1*weight*4)
+	#
+	# g1_r = g_1 * result;	g1_r_p = commitment_1 + -X*c
+	# g2_r = g_2 * result;	g2_r_p = commitment_2 + -R_sum*c
+	# if g1_r != g1_r_p: return False
+	# if g2_r != g2_r_p: return False
 
+	
 	return True
 
-def load_ballot_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint], List[List[EccPoint]], List[List[EccPoint]],
-											List[Integer], List[EccPoint], List[EccPoint], List[int], List[int], List[int]]:
+def ballots_range_proof(R_ss: List[List[EccPoint]], Z_ss: List[List[EccPoint]],
+						r_ss: List[List[Integer]], d_ss: List[List[Integer]],
+						R_s: List[EccPoint], Z_s: List[EccPoint],
+						A_ss: List[List[EccPoint]], B_ss: List[List[EccPoint]],
+						ballot_ids: List[int], weights: List[int], election_data: Dict[str, Union[int, EccPoint, NoneType]]) -> List[bool]:
+	election_id: int = election_data["election_id"]
+	min_votes, max_votes = election_data["min_votes"], election_data["max_votes"]
+	g_1: EccPoint; g_2: EccPoint
+	g_1, g_2 = election_data["g_1"], election_data["g_2"]
+	vote_cast = list(range(min_votes, max_votes + 1))
+	valids: List[bool] = list()
+	
+	for R_s_option, Z_s_option, r_s, d_s, R, Z, A_s, B_s, ballot_id, w in zip(R_ss, Z_ss, r_ss, d_ss, R_s, Z_s, A_ss, B_ss, ballot_ids, weights):
+		R_sum = reduce(lambda x, y: x + y, R_s_option[1:], R_s_option[0]); Z_sum = reduce(lambda x, y: x + y, Z_s_option[1:], Z_s_option[0])
+		# print("TYPE", type(R_s_option[0]), type(R_sum), type(Z_s_option[0]), type(Z_sum))
+		# R_sum = R_sum % Nist256.order; Z_sum = Z_sum % Nist256.order
+
+	
+
+		_context_info = ','.join([str(election_id), str(ballot_id)])
+		message: str = ','.join(str(i) for i in [_context_info,  # This matches the python code's order
+											*g_2.xy, *g_1.xy,
+											*Z.xy, *R.xy,
+											*[A.xy for A in A_s],
+											*[B.xy for B in B_s]])
+		challenge: Integer = Integer.from_bytes(hashlib.sha256(message.encode("utf-8")).digest(), 'big')
+		
+		# challenge verification
+		# sum_d: Integer = Integer(d_s[0])
+		# for i in d_s[1:]:	sum_d = sum_d + i
+		# if (sum_d % Nist256.order) != (challenge % Nist256.order): print(f"challenge invalid {sum_d % Nist256.order} {challenge % Nist256.order}"); valids.append(False); continue  # the python code implements it with a modulus...
+
+		valid: bool = True
+		for i, (A, B, w_i) in enumerate(zip(A_s, B_s, vote_cast)):  # consume all the alternative forms
+			A_p = g_2 * r_s[i] + R * d_s[i]						#TODO that works
+			A_p_p = g_2 * r_s[i] + R_sum * d_s[i]					#TODO that's broken
+			if A != A_p: print("A != A_p"); valid = False; break
+			if A != A_p_p: print("A != A_p_p"); valid = False; break
+
+			w_i = w_i * w
+			B_p = g_1 * r_s[i] + (Z + -(g_1 * w_i)) * d_s[i]		#TODO that works
+			B_p_p = g_1 * r_s[i] + (Z_sum + -(g_1 * w_i)) * d_s[i]	#TODO that's broken
+			if B_p != B: print(f"B_p != B {w_i} - {len(A_s)}, {len(vote_cast)}, {vote_cast}, {w}"); valid = False; break
+			if B_p_p != B: print(f"B_p_p != B {Z.xy} {Z_sum.xy} {w_i} - {len(A_s)}, {len(vote_cast)}, {vote_cast},  {w}"); valid = False; break
+			else: print(f"{w_i} - {w}")
+
+		valids.append(valid)
+
+	return valids
+
+def load_ballot_proof(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint]], List[List[EccPoint]],
+											List[Integer], List[EccPoint], List[EccPoint], List[int], List[int], List[int]],
+											Dict[str, Union[int, EccPoint, NoneType]]]:
 
 	g_1s: List[EccPoint] = list(); 		g_2s: List[EccPoint] = list()
 	Rs: List[List[EccPoint]] = list(); 	Zs: List[List[EccPoint]] = list()
@@ -505,6 +595,10 @@ def load_ballot_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoi
 	g_1: EccPoint = Nist256.get_generator(); g_2: EccPoint = import_pt_fct(data["election_context"]["unique_generator"])
 
 	election_id: int = int(data["election_context"]["election_id"])
+	election_data: Dict[str, Union[int, EccPoint, NoneType]] = {"election_id": election_id, "voting_type": int(data["election_context"]["voting_type"]),
+													  "g_1": g_1, "g_2": g_2,
+													  'min_votes': data["election_context"]["min_votes"] if 'min_votes' in data["election_context"] else None,
+													  'max_votes': data["election_context"]["max_votes"] if 'max_votes' in data["election_context"] else None}
 	for ballot_receipt in data["ballot_set"]:
 		# state 0 receipt have just been created and not acted upon
 		# they do not have any option selected (let alone confirmed)
@@ -527,7 +621,61 @@ def load_ballot_proof(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoi
 			Rs[-1].append(import_pt_fct(one_of_n_zkp["cyphertext_R"]))
 			Zs[-1].append(import_pt_fct(one_of_n_zkp["cyphertext_Z"]))
 
-	return g_1s, g_2s, Rs, Zs, results, commitment_1s, commitment_2s, election_ids, ballot_ids, weights
+	return (Rs, Zs, results, commitment_1s, commitment_2s, election_ids, ballot_ids, weights), election_data
+
+
+def load_ballot_range_proof(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint]], List[List[EccPoint]],
+																List[List[Integer]], List[List[Integer]],
+																List[EccPoint], List[EccPoint],
+																List[List[EccPoint]], List[List[EccPoint]],
+																List[int], List[int]],
+															Dict[str, Union[int, EccPoint, NoneType]]]:
+
+	# ballot's option entries R & Z (X and Y according to the paper)
+	R_ss: List[List[EccPoint]] = list(); 	Z_ss: List[List[EccPoint]] = list()
+
+	# individual range proof data
+	r_s: List[List[Integer]] = list(); d_s: List[List[Integer]] = list()
+	R_s: List[EccPoint] = list(); 	Z_s: List[EccPoint] = list()
+	A_s: List[List[EccPoint]] = list(); B_s: List[List[EccPoint]] = list()
+	ballot_ids: List[int] = list(); weights: List[int] = list()
+
+	import_pt_fct = EccPointSerialisationUtils.import_named_curve_ecc_point_from_string_public_key
+
+	g_1: EccPoint = Nist256.get_generator(); g_2: EccPoint = import_pt_fct(data["election_context"]["unique_generator"])
+
+	election_id: int = int(data["election_context"]["election_id"])
+	election_data: Dict[str, Union[int, EccPoint, NoneType]] = {"election_id": election_id, "voting_type": int(data["election_context"]["voting_type"]),
+													  "g_1": g_1, "g_2": g_2,
+													  'min_votes': data["election_context"]["min_votes"] if 'min_votes' in data["election_context"] else None,
+													  'max_votes': data["election_context"]["max_votes"] if 'max_votes' in data["election_context"] else None}
+	for ballot_receipt in data["ballot_set"]:
+		# state 0 receipt have just been created and not acted upon
+		# they do not have any option selected (let alone confirmed)
+		if ballot_receipt["state"] == 0: continue
+
+		s_one_data = ballot_receipt["stage_one"]["stage_one_data"]; range_zkp = s_one_data["range_zkp"]
+		
+		r_s.append([Integer(i) for i in range_zkp["result_r_i"]])
+		d_s.append([Integer(i) for i in range_zkp["result_d_i"]])
+
+		R_s.append(import_pt_fct(range_zkp["cyphertext_R"]))
+		Z_s.append(import_pt_fct(range_zkp["cyphertext_Z"]))
+
+		A_s.append([import_pt_fct(i) for i in range_zkp["commitments_A"]])
+		B_s.append([import_pt_fct(i) for i in range_zkp["commitments_B"]])
+
+		R_s_option: List[EccPoint] = list(); 	Z_s_option: List[EccPoint] = list()
+		for one_of_n_zkp in s_one_data["one_of_n_zkps"]:
+			R_s_option.append(import_pt_fct(one_of_n_zkp["cyphertext_R"]))
+			Z_s_option.append(import_pt_fct(one_of_n_zkp["cyphertext_Z"]))
+		R_ss.append(R_s_option); Z_ss.append(Z_s_option)
+			
+
+		ballot_ids.append(int(ballot_receipt["ballot_id"]))
+		weights.append(int(ballot_receipt["weight"]))
+
+	return (R_ss, Z_ss, r_s, d_s, R_s, Z_s, A_s, B_s, ballot_ids, weights), election_data
 
 def tally_check(g_1: EccPoint, g_2: EccPoint, options_Rs: List[EccPoint], options_Zs: List[EccPoint],
 		  options_tally: int, options_sum: int):
