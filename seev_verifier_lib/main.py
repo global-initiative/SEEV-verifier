@@ -6,8 +6,9 @@ from typing import Tuple, Callable
 import os
 import sys
 
-from seev_verifier_lib.verifier_lib import verify_signature, load_verify_signature, load_vote_proof, vote_proof, \
-	load_ballot_proof, ballots_proof, load_tally_data, tally_check, load_verify_audited_ballots, verify_audited_ballots
+from seev_verifier_lib.verifier_lib import verify_signature, load_verify_signature, \
+	load_ballot_proof, ballots_proof, load_tally_data, tally_check, load_verify_audited_ballots, verify_audited_ballots, \
+	load_vote_proof_list, vote_proof_list, load_ballot_range_proof, ballots_range_proof
 
 
 def verify(data_raw):
@@ -21,12 +22,17 @@ def verify(data_raw):
 	res_signature: Tuple[bool, ...] = tuple(verify_signature(*d) for d in data)
 	print("\t- SIGNATURE\t\t", res_signature)
 
-	data = load_vote_proof(data_raw);	data = zip(*data)
-	res_vote_proof: Tuple[bool, ...] = tuple(vote_proof(*d) for d in data)
+	data, election_data = load_vote_proof_list(data_raw);	data = zip(*data)
+	res_vote_proof: Tuple[bool, ...] = tuple(vote_proof_list(*d, election_data=election_data) for d in data)
 	print("\t- VOTE\t\t\t", res_vote_proof)
-
-	data = load_ballot_proof(data_raw);	data = zip(*data)
-	res_ballot_proof: Tuple[bool, ...] = tuple(ballots_proof(*d) for d in data)
+	
+	voting_type = int(election_data["voting_type"])
+	if voting_type == 3:
+		data, election_data = load_ballot_range_proof(data_raw)
+		res_ballot_proof: Tuple[bool, ...] = tuple(ballots_range_proof(*data, election_data=election_data))
+	else:
+		data, election_data = load_ballot_proof(data_raw);	data = zip(*data)
+		res_ballot_proof: Tuple[bool, ...] = tuple(ballots_proof(*d, election_data=election_data) for d in data)
 	print("\t- BALLOT\t\t", res_ballot_proof)
 
 	data = load_tally_data(data_raw);	data = zip(*data)
