@@ -4,12 +4,12 @@ from setuptools import setup, find_packages
 # If you have more dependencies, add them here
 install_requires = [
     'pycryptodome~=3.18.0',
-    'SEEV-base-cryptography~=0.0.2'
+    'SEEV-base-cryptography~=0.0.4'
 ]
 
 setup(
     name='SEEV-verifier',
-    version='0.0.11',
+    version='0.0.12',
     description='Implementation of the SEEV DRE-IP verifier software',
     author='Timothee Dubuc',
     author_email='timothee@global-initiative.com',
