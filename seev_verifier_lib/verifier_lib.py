@@ -35,6 +35,7 @@ def load_verify_signature(data: Dict[str, Any]) -> Tuple[List[bytes], List[bytes
 		if ballot_receipt["state"] == 0: continue
 
 		s_one = ballot_receipt["stage_one"]
+		if s_one["stage_one_signature"] is None: continue  # STV implementation does not have such value - no crypto
 		# justified by core.serializers.serialization_utils.serialized_data_to_message
 		stage_one_data: bytes = json.dumps(s_one["stage_one_data"]).encode('utf-8')
 		# justified by test.state_analysis.serialized_data_checks.check_bulletin_board_stage_one_serialization
@@ -72,7 +73,7 @@ def load_verify_audited_ballots(data: Dict[str, Any]) -> Tuple[List[EccPoint], L
 		s_two = ballot_receipt["stage_two"]; s_two_data = s_two["stage_two_data"]
 
 		sort_option_ids = lambda s: sorted(s, key=lambda i:i["option_id"])
-
+		if s_two_data["zkp_secrets"] is None: continue  # STV implementation does not have such value - no crypto
 		for one_of_n_zkp, zkp_secrets in zip(sort_option_ids(s_one_data["one_of_n_zkps"]), sort_option_ids(s_two_data["zkp_secrets"])):
 			if int(one_of_n_zkp["option_id"]) != int(zkp_secrets["option_id"]):  # this should not happen, but in case an option is missing, that will be raised
 				raise ValueError("Missaligned option_ids between one_of_n_zkps and zkp_secrets, please contact your administrator")
@@ -203,7 +204,7 @@ def load_vote_proof_list(data: Dict[str, Any]) -> Tuple[Tuple[List[List[List[Int
 		election_ids: List[int] = list(); ballot_ids: List[int] = list(); option_ids: List[int] = list()
 		weights: List[int] = list()
 
-		for one_of_n_zkp in s_one_data["one_of_n_zkps"]:
+		for one_of_n_zkp in s_one_data["one_of_n_zkps"]:  # empty for STV, we are good.
 
 			r_s.append([Integer(i) for i in one_of_n_zkp["result_r_i"]])
 			d_s.append([Integer(i) for i in one_of_n_zkp["result_d_i"]])
@@ -321,6 +322,7 @@ def load_ballot_proof(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPoint]],
 		if ballot_receipt["state"] == 0: continue
 
 		s_one_data = ballot_receipt["stage_one"]["stage_one_data"]; eq_zkp = s_one_data["equality_zkp"]
+		if s_one_data["equality_zkp"] is None: continue  # STV implementation does not have such value - no crypto
 
 		# This is g_1^s and g_2^s
 		results.append(Integer(eq_zkp["result"]))
@@ -371,6 +373,7 @@ def load_ballot_range_proof(data: Dict[str, Any]) -> Tuple[Tuple[List[List[EccPo
 		if ballot_receipt["state"] == 0: continue
 
 		s_one_data = ballot_receipt["stage_one"]["stage_one_data"]; range_zkp = s_one_data["range_zkp"]
+		if s_one_data["range_zkp"] is None: continue  # STV implementation does not have such value - no crypto, though this one should not happen
 		
 		r_s.append([Integer(i) for i in range_zkp["result_r_i"]])
 		d_s.append([Integer(i) for i in range_zkp["result_d_i"]])
