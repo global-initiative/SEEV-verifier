@@ -74,6 +74,24 @@ def load_verify_audited_ballots(data: Dict[str, Any]) -> Tuple[List[EccPoint], L
 
 		sort_option_ids = lambda s: sorted(s, key=lambda i:i["option_id"])
 		if s_two_data["zkp_secrets"] is None: continue  # STV implementation does not have such value - no crypto
+
+		hash_from_s1 = s_one['stage_one_hash']
+		hash_from_s2 = s_two_data['stage_one_hash']
+
+		if hash_from_s1 != None and hash_from_s2 == None:
+			raise ValueError("stage_one_hash is present in stage_one_data but empty in stage_two_data, please contact your administrator")
+
+		if hash_from_s1 != hash_from_s2:
+			raise ValueError("stage_one_hash from stage_one_data doesn't match the hash in stage_two_data, please contact your administrator")
+		
+		hash_char_limit = 50 # Taken from API project config
+		hash_for_verification = json.dumps(s_one_data).encode('utf-8')
+		hash_for_verification = base64.b32encode(hashlib.sha512(hash_for_verification).digest())[0:hash_char_limit].decode("utf-8")
+
+		if hash_for_verification != hash_from_s1:
+			raise ValueError("The data that produced stage_one_hash originally, doesn't match the hash produced during this verification, please contact your administrator")
+
+		
 		for one_of_n_zkp, zkp_secrets in zip(sort_option_ids(s_one_data["one_of_n_zkps"]), sort_option_ids(s_two_data["zkp_secrets"])):
 			if int(one_of_n_zkp["option_id"]) != int(zkp_secrets["option_id"]):  # this should not happen, but in case an option is missing, that will be raised
 				raise ValueError("Missaligned option_ids between one_of_n_zkps and zkp_secrets, please contact your administrator")
