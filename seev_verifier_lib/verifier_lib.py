@@ -55,6 +55,33 @@ def verify_audited_ballots(g_1: EccPoint, g_2: EccPoint, r: Integer, v: Integer,
 	if Z_prime != Z or R_prime != R: 	return False
 	else: 								return True
 
+"""
+Runs checks needed to determine if a bulletin board's ballots
+are valid, if not an error is raised and execution is stopped.
+This can be called during various bulletin board operations since
+difference elections can skip certain actions, e.g. checking for
+audited ballots.
+"""
+def check_ballot_is_valid(ballot_receipt):
+	s_one = ballot_receipt["stage_one"]; s_one_data = s_one["stage_one_data"]
+	s_two = ballot_receipt["stage_two"]; s_two_data = s_two["stage_two_data"]
+
+	hash_from_s1 = s_one['stage_one_hash']
+	hash_from_s2 = s_two_data['stage_one_hash']
+
+	if hash_from_s1 != None and hash_from_s2 == None:
+		raise ValueError("stage_one_hash is present in stage_one_data but empty in stage_two_data, please contact your administrator")
+
+	if hash_from_s1 != hash_from_s2:
+		raise ValueError("stage_one_hash from stage_one_data doesn't match the hash in stage_two_data, please contact your administrator")
+	
+	hash_char_limit = 50 # Taken from API project config
+	hash_for_verification = json.dumps(s_one_data).encode('utf-8')
+	hash_for_verification = base64.b32encode(hashlib.sha512(hash_for_verification).digest())[0:hash_char_limit].decode("utf-8")
+
+	if hash_for_verification != hash_from_s1:
+		raise ValueError("The data that produced stage_one_hash originally, doesn't match the hash produced during this verification, please contact your administrator")
+
 
 def load_verify_audited_ballots(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint],
 																List[Integer], List[Integer],
@@ -75,22 +102,7 @@ def load_verify_audited_ballots(data: Dict[str, Any]) -> Tuple[List[EccPoint], L
 		sort_option_ids = lambda s: sorted(s, key=lambda i:i["option_id"])
 		if s_two_data["zkp_secrets"] is None: continue  # STV implementation does not have such value - no crypto
 
-		hash_from_s1 = s_one['stage_one_hash']
-		hash_from_s2 = s_two_data['stage_one_hash']
-
-		if hash_from_s1 != None and hash_from_s2 == None:
-			raise ValueError("stage_one_hash is present in stage_one_data but empty in stage_two_data, please contact your administrator")
-
-		if hash_from_s1 != hash_from_s2:
-			raise ValueError("stage_one_hash from stage_one_data doesn't match the hash in stage_two_data, please contact your administrator")
-		
-		hash_char_limit = 50 # Taken from API project config
-		hash_for_verification = json.dumps(s_one_data).encode('utf-8')
-		hash_for_verification = base64.b32encode(hashlib.sha512(hash_for_verification).digest())[0:hash_char_limit].decode("utf-8")
-
-		if hash_for_verification != hash_from_s1:
-			raise ValueError("The data that produced stage_one_hash originally, doesn't match the hash produced during this verification, please contact your administrator")
-
+		check_ballot_is_valid(ballot_receipt)
 		
 		for one_of_n_zkp, zkp_secrets in zip(sort_option_ids(s_one_data["one_of_n_zkps"]), sort_option_ids(s_two_data["zkp_secrets"])):
 			if int(one_of_n_zkp["option_id"]) != int(zkp_secrets["option_id"]):  # this should not happen, but in case an option is missing, that will be raised
@@ -455,6 +467,8 @@ def load_tally_data(data: Dict[str, Any]) -> Tuple[List[EccPoint], List[EccPoint
 	for ballot_receipt in data["ballot_set"]:
 		if int(ballot_receipt["state"]) != 2: continue  # ignore the ballots that are not confirmed
 		s_one_data = ballot_receipt["stage_one"]["stage_one_data"]
+
+		check_ballot_is_valid(ballot_receipt)
 
 		for one_of_n_zkp in s_one_data["one_of_n_zkps"]:
 			options_Rs[index_map[int(one_of_n_zkp["option_id"])]].append(import_pt_fct(one_of_n_zkp["cyphertext_R"]))
